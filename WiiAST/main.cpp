@@ -1,16 +1,17 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include <iostream>  //Console i/o
 #include <string>    //Console i/o parsing
+#include <cstdint>   //Integer types
 #include <Windows.h> //Audio output (using mmsystem)
 using namespace std;
 
 //Wii types
-using u8 = unsigned char;
-using u16 = unsigned short;
-using u32 = unsigned long;
-using s8 = signed char;
-using s16 = signed short;
-using s32 = signed char;
+using u8 = uint8_t;
+using u16 = uint16_t;
+using u32 = uint32_t;
+using s8 = int8_t;
+using s16 = int16_t;
+using s32 = int32_t;
 
 //Number of buffer for autio output
 #define BUFFER_COUNT 4
@@ -42,7 +43,7 @@ Offset	Size	Description
 0x0024	28	Unknown (Usually all zeros except 0x0028, which is 0x7F)
 
 */
-BIG_ENDIAN_32_STRUCT HEADER{
+BIG_ENDIAN_32_STRUCT ASTHEADER{
     u32 magic;
     u32 dataSize;
     u32 Unk;
@@ -67,7 +68,7 @@ BIG_ENDIAN_32_STRUCT HEADER{
         if(magic!=0x5354524D)throw bad_file("STRM magic failed");
     }
 
-} header;
+} astHeader;
 
 /*
 [From wiibrew]
@@ -180,10 +181,10 @@ void WriteWave(){
     bool AnotherLoop = false;
 
     //AST block structure
-    BLOCKHEADER header;
+    BLOCKHEADER blockHeader;
 
     try{
-        if(ftell(curStream)==::header.dataSize+64){
+        if(ftell(curStream)==astHeader.dataSize+64){
             //If we hit the end of the file, then do the loop
             cout<<"Looping..."<<endl;
             AnotherLoop = true;
@@ -194,17 +195,17 @@ void WriteWave(){
 
         //Read the block header
         AssertNeof(curStream);
-        fread(&header,sizeof(header),1,curStream);
-        ChangeEndian32(&header,sizeof(header)/4);
-        header.AssertMagic();
+        fread(&blockHeader,sizeof(blockHeader),1,curStream);
+        ChangeEndian32(&blockHeader,sizeof(blockHeader)/4);
+        blockHeader.AssertMagic();
 
         //Prepare the buffer
         if(data[swap])delete[] data[swap];
         //"sampleCount" - sample count for wavout, 2 channels totally
         //"inSampleCount" - sample count read from AST, 1/2/4 channels totally
         u32 sampleCount,inSampleCount;
-        inSampleCount = header.blockSize*::header.channelCount/2;
-        sampleCount = header.blockSize/* *2 /2 */;
+        inSampleCount = blockHeader.blockSize*astHeader.channelCount/2;
+        sampleCount = blockHeader.blockSize/* *2 /2 */;
         data[swap] = new s16[sampleCount];
         buffer = new s16[inSampleCount];
 
@@ -216,13 +217,13 @@ void WriteWave(){
         //Rearrange the data from "buffer" to "data"
         for(u32 i = 0; i<sampleCount; i++){
             data[swap][i] = buffer[(
-                i%2)*header.blockSize/2
+                i%2)*blockHeader.blockSize/2
                 +i/2];
-            if(::header.channelCount==4){
+            if(astHeader.channelCount==4){
                 data[swap][i] = (s16)(
                     surroundAlpha*data[swap][i]+
                     (1-surroundAlpha)*buffer[(
-                        i%2+2)*header.blockSize/2
+                        i%2+2)*blockHeader.blockSize/2
                     +i/2]
                     );
             }
@@ -294,25 +295,25 @@ void SaveToWav(FILE* wav){
 
     }wavfileheader{
         0x46464952,
-        ::header.sampleCount*4+36,
+        astHeader.sampleCount*4+36,
         0x45564157,
         0x20746D66,
 
         0x00000010,
         1,2,
-        ::header.sampleRate,
-        ::header.sampleRate*4,
+        astHeader.sampleRate,
+        astHeader.sampleRate*4,
 
         4,16,
         0x61746164,
-        ::header.sampleCount*4
+        astHeader.sampleCount*4
     };
     fseek(wav,0,SEEK_SET);
     fwrite(&wavfileheader,sizeof(wavfileheader),1,wav);
     fseek(curStream,64,SEEK_SET);
 
 
-    while(ftell(curStream)!=::header.dataSize+64){
+    while(ftell(curStream)!=astHeader.dataSize+64){
         BLOCKHEADER header;
         s16* buffer;
         fread(&header,sizeof(header),1,curStream);
@@ -320,7 +321,7 @@ void SaveToWav(FILE* wav){
         header.AssertMagic();
 
         u32 SampleCount,outSampleCount;
-        SampleCount = header.blockSize*::header.channelCount/2;
+        SampleCount = header.blockSize*astHeader.channelCount/2;
         outSampleCount = header.blockSize/2;
         buffer = new s16[SampleCount];
         AssertNeof(curStream);
@@ -330,7 +331,7 @@ void SaveToWav(FILE* wav){
             s16 left,right;
             left = buffer[i];
             right = buffer[i+outSampleCount];
-            if(::header.channelCount==4){
+            if(astHeader.channelCount==4){
                 left = (s16)(
                     surroundAlpha*left+
                     (1-surroundAlpha)*buffer[i+2*outSampleCount]
@@ -384,7 +385,7 @@ int main(){
                 //Change surroundAlpha
                 surroundAlpha = (float)atof(input.c_str()+2);
                 cout<<"Set surroundAlpha="<<surroundAlpha<<endl;
-                if(header.channelCount!=4){
+                if(astHeader.channelCount!=4){
                     cout<<"surroundAlpha does not affect because channelCount!=4"<<endl;
                 }
                 else if(surroundAlpha<0.0f || surroundAlpha >1.0f){
@@ -469,42 +470,42 @@ int main(){
         astFileName = input;
 
         //Read the AST Header
-        fread(&header,sizeof(header),1,curStream);
-        ChangeEndian32(&header,sizeof(header)/4);
+        fread(&astHeader,sizeof(astHeader),1,curStream);
+        ChangeEndian32(&astHeader,sizeof(astHeader)/4);
         try{
-            header.AssertMagic();
+            astHeader.AssertMagic();
 
             cout<<"===File Information==="<<endl;
-            cout<<"dataSize="<<header.dataSize
+            cout<<"dataSize="<<astHeader.dataSize
                 <<" bytes"<<endl;
-            cout<<"channelCount="<<header.channelCount<<endl;
-            cout<<"sampleRate="<<header.sampleRate
+            cout<<"channelCount="<<astHeader.channelCount<<endl;
+            cout<<"sampleRate="<<astHeader.sampleRate
                 <<" Hz per channel"<<endl;
-            cout<<"sampleCount="<<header.sampleCount
+            cout<<"sampleCount="<<astHeader.sampleCount
                 <<" per channel"<<endl;
-            cout<<"*sampleTime="<<(double)header.sampleCount/header.sampleRate
+            cout<<"*sampleTime="<<(double)astHeader.sampleCount/astHeader.sampleRate
                 <<" seconds"<<endl;
-            cout<<"loopPosition="<<header.loopPosition
+            cout<<"loopPosition="<<astHeader.loopPosition
                 <<" samples per channel"<<endl;
-            cout<<"*loopPostion="<<(double)header.loopPosition/header.sampleRate
+            cout<<"*loopPostion="<<(double)astHeader.loopPosition/astHeader.sampleRate
                 <<" seconds"<<endl;
-            cout<<"firstBlockSize="<<header.firstBlockSize
+            cout<<"firstBlockSize="<<astHeader.firstBlockSize
                 <<" bytes per channel"<<endl;
-            cout<<"*firstBlockSize="<<(double)header.firstBlockSize/2/header.sampleRate
+            cout<<"*firstBlockSize="<<(double)astHeader.firstBlockSize/2/astHeader.sampleRate
                 <<" seconds"<<endl;
 
             //Find the actual loop point
             cout<<"Building loop..."<<endl;
-            LoopBeginOffset = ::header.loopPosition;
-            BLOCKHEADER bheader;
+            LoopBeginOffset = astHeader.loopPosition;
+            BLOCKHEADER blockHeader;
             while(1){
                 AssertNeof(curStream);
-                fread(&bheader,sizeof(bheader),1,curStream);
-                ChangeEndian32(&bheader,sizeof(bheader)/4);
-                header.AssertMagic();
-                if(LoopBeginOffset>=bheader.blockSize/2){
-                    LoopBeginOffset -= bheader.blockSize/2;
-                    fseek(curStream,bheader.blockSize*::header.channelCount,SEEK_CUR);
+                fread(&blockHeader,sizeof(blockHeader),1,curStream);
+                ChangeEndian32(&blockHeader,sizeof(blockHeader)/4);
+                astHeader.AssertMagic();
+                if(LoopBeginOffset>=blockHeader.blockSize/2){
+                    LoopBeginOffset -= blockHeader.blockSize/2;
+                    fseek(curStream,blockHeader.blockSize*astHeader.channelCount,SEEK_CUR);
                 }
                 else break;
             }
@@ -521,7 +522,7 @@ int main(){
 
         //Init mmsystem
         cout<<"Init..."<<endl;
-        wfe.nSamplesPerSec = header.sampleRate;
+        wfe.nSamplesPerSec = astHeader.sampleRate;
         wfe.nAvgBytesPerSec = wfe.nSamplesPerSec*4;
         MMRESULT mmresult;
         mmresult = waveOutOpen(&hwo,WAVE_MAPPER,&wfe,(DWORD_PTR)waveOutProc,0,
