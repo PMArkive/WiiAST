@@ -369,11 +369,11 @@ int main(){
     //Welcome
     cout<<"===WiiAST===by wwylele"<<endl;
     cout<<"Command:"<<endl;
-    cout<<"-a[###=0~1] - Set surroundAlpha to ###. Defualt is 0.8."<<endl;
+    cout<<"-a### - Set surroundAlpha to ###. Defualt is 0.8."<<endl;
     cout<<"-s - Stop."<<endl;
     cout<<"-q - Quit."<<endl;
-    cout<<"-w - Convert to wave file and save"<<endl;
-    cout<<"[File] - Open an AST file and play."<<endl;
+    cout<<"-w - Convert to wave file and save."<<endl;
+    cout<<"[file name] - Open an AST file and play."<<endl;
     cout<<"===WiiAST===\n"<<endl;
 
 
