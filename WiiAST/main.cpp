@@ -2,6 +2,7 @@
 #include <iostream>  //Console i/o
 #include <string>    //Console i/o parsing
 #include <cstdint>   //Integer types
+#include <atomic>    //Atomic vars
 #include <Windows.h> //Audio output (using mmsystem)
 using namespace std;
 
@@ -94,22 +95,22 @@ BIG_ENDIAN_32_STRUCT BLOCKHEADER{
 
 
 //The .AST file
-FILE* volatile curStream = nullptr;
+atomic<FILE*> curStream(nullptr);
 
 //mmsystem waveout device
 HWAVEOUT hwo = NULL;
 WAVEFORMATEX wfe = { WAVE_FORMAT_PCM,2,44100,44100*4,4,16,sizeof(WAVEFORMATEX) };
 
 //surroundAlpha for 4-channel music
-volatile float surroundAlpha = 0.8f;
+atomic<double> surroundAlpha(0.8f);
 
 //Multi-thread conversation flag
 //Set before call waveOutReset
-volatile bool stopPlayFlag = false;
+atomic<bool> stopPlayFlag(false);
 
 //Loop position
-volatile long LoopBeginBlockOffset = 64;// in bytes
-volatile u32 LoopBeginOffset = 0;//in samples for 1 channel
+atomic<long> LoopBeginBlockOffset(64);// in bytes
+atomic<u32> LoopBeginOffset(0);//in samples for 1 channel
 
 //The .ast file name
 //Used when coverting to .wav file
@@ -156,7 +157,7 @@ void Cleanup(){
         stopPlayFlag = false;
         hwo = NULL;
     }
-    if(curStream){
+    if(curStream.load()){
         fclose(curStream);
         curStream = nullptr;
     }
@@ -176,6 +177,8 @@ void WriteWave(){
 
     //WAVEHDR structure for waveout
     static WAVEHDR wh[BUFFER_COUNT] = { 0 };
+
+    double surroundAlphaCache = surroundAlpha;
 
     //The flag set when a loop begin
     bool AnotherLoop = false;
@@ -221,8 +224,8 @@ void WriteWave(){
                 +i/2];
             if(astHeader.channelCount==4){
                 data[swap][i] = (s16)(
-                    surroundAlpha*data[swap][i]+
-                    (1-surroundAlpha)*buffer[(
+                    surroundAlphaCache*data[swap][i]+
+                    (1-surroundAlphaCache)*buffer[(
                         i%2+2)*blockHeader.blockSize/2
                     +i/2]
                     );
@@ -276,6 +279,7 @@ void CALLBACK waveOutProc(
 }
 
 void SaveToWav(FILE* wav){
+    double surroundAlphaCache = surroundAlpha;
     struct WAVFILEHEADER{
         u32 _RIFF;
         u32 dataSize;
@@ -333,12 +337,12 @@ void SaveToWav(FILE* wav){
             right = buffer[i+outSampleCount];
             if(astHeader.channelCount==4){
                 left = (s16)(
-                    surroundAlpha*left+
-                    (1-surroundAlpha)*buffer[i+2*outSampleCount]
+                    surroundAlphaCache*left+
+                    (1-surroundAlphaCache)*buffer[i+2*outSampleCount]
                     );
                 right = (s16)(
-                    surroundAlpha*right+
-                    (1-surroundAlpha)*buffer[i+3*outSampleCount]
+                    surroundAlphaCache*right+
+                    (1-surroundAlphaCache)*buffer[i+3*outSampleCount]
                     );
             }
             fwrite(&left,2,1,wav);
@@ -381,19 +385,20 @@ int main(){
 
         if(input[0]=='-'){//Recieve a special command
             switch(input[1]){
-            case 'a':case 'A':
+            case 'a':case 'A':{
                 //Change surroundAlpha
-                surroundAlpha = (float)atof(input.c_str()+2);
-                cout<<"Set surroundAlpha="<<surroundAlpha<<endl;
+                double surroundAlphaCache = (float)atof(input.c_str()+2);
+                cout<<"Set surroundAlpha="<<surroundAlphaCache<<endl;
                 if(astHeader.channelCount!=4){
                     cout<<"surroundAlpha does not affect because channelCount!=4"<<endl;
                 }
-                else if(surroundAlpha<0.0f || surroundAlpha >1.0f){
+                else if(surroundAlphaCache<0.0f || surroundAlphaCache >1.0f){
                     cout<<"Bad surroundAlpha, but still keep playing."<<endl;
                     //Yep, that's what it means.
                     //Because I'd like to try.
                 }
-                break;
+                surroundAlpha = surroundAlphaCache;
+                break; }
             case 's':case 'S':
                 //Stop the music
                 cout<<"Stop"<<endl;
@@ -402,7 +407,7 @@ int main(){
             case 'w':
                 //Convert to wav
             {
-                if(!curStream){
+                if(!curStream.load()){
                     cout<<"No valid .ast file is opened"<<endl;
                     break;
                 }
