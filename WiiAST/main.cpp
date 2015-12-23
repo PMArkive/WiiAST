@@ -1,5 +1,6 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include <iostream>  //Console i/o
+#include <iomanip>
 #include <string>    //Console i/o parsing
 #include <cstdint>   //Integer types
 #include <atomic>    //Atomic vars
@@ -363,6 +364,8 @@ int main(){
     //Init
     atexit(OnExit);
 
+    cout<<setiosflags(ios::left);
+
     //Welcome
     cout<<"===WiiAST===by wwylele"<<endl;
     cout<<"Command:"<<endl;
@@ -408,7 +411,7 @@ int main(){
                 //Convert to wav
             {
                 if(!curStream.load()){
-                    cout<<"No valid .ast file is opened"<<endl;
+                    cout<<"No valid .ast file is open"<<endl;
                     break;
                 }
                 cout<<"Converting..."<<endl;
@@ -479,24 +482,28 @@ int main(){
         ChangeEndian32(&astHeader,sizeof(astHeader)/4);
         try{
             astHeader.AssertMagic();
-
+            const int leftW = 20;
             cout<<"===File Information==="<<endl;
-            cout<<"dataSize="<<astHeader.dataSize
-                <<" bytes"<<endl;
-            cout<<"channelCount="<<astHeader.channelCount<<endl;
-            cout<<"sampleRate="<<astHeader.sampleRate
-                <<" Hz per channel"<<endl;
-            cout<<"sampleCount="<<astHeader.sampleCount
-                <<" per channel"<<endl;
-            cout<<"*sampleTime="<<(double)astHeader.sampleCount/astHeader.sampleRate
+            cout<<setw(leftW)<<"  dataSize="<<setw(0)
+                <<astHeader.dataSize<<" bytes"<<endl;
+            cout<<setw(leftW)<<"  channelCount="<<setw(0)
+                <<astHeader.channelCount<<endl;
+            cout<<setw(leftW)<<"  sampleRate="<<setw(0)
+                <<astHeader.sampleRate<<" Hz per channel"<<endl;
+            cout<<setw(leftW)<<"  sampleCount="<<setw(0)
+                <<astHeader.sampleCount<<" per channel"<<endl;
+            cout<<setw(leftW)<<" *sampleTime="<<setw(0)
+                <<(double)astHeader.sampleCount/astHeader.sampleRate
                 <<" seconds"<<endl;
-            cout<<"loopPosition="<<astHeader.loopPosition
-                <<" samples per channel"<<endl;
-            cout<<"*loopPostion="<<(double)astHeader.loopPosition/astHeader.sampleRate
+            cout<<setw(leftW)<<"  loopPosition="<<setw(0)
+                <<astHeader.loopPosition<<" samples per channel"<<endl;
+            cout<<setw(leftW)<<" *loopPostion="<<setw(0)
+                <<(double)astHeader.loopPosition/astHeader.sampleRate
                 <<" seconds"<<endl;
-            cout<<"firstBlockSize="<<astHeader.firstBlockSize
-                <<" bytes per channel"<<endl;
-            cout<<"*firstBlockSize="<<(double)astHeader.firstBlockSize/2/astHeader.sampleRate
+            cout<<setw(leftW)<<"  firstBlockSize="<<setw(0)
+                <<astHeader.firstBlockSize<<" bytes per channel"<<endl;
+            cout<<setw(leftW)<<" *firstBlockSize="<<setw(0)
+                <<(double)astHeader.firstBlockSize/2/astHeader.sampleRate
                 <<" seconds"<<endl;
 
             //Find the actual loop point
