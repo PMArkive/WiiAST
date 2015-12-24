@@ -281,6 +281,9 @@ void CALLBACK waveOutProc(
 
 void SaveToWav(FILE* wav){
     double surroundAlphaCache = surroundAlpha;
+    const int fadeOutSampleCount = 200000;
+    int currentFadeOut = fadeOutSampleCount;
+    int totalSampleCount = 0;
     struct WAVFILEHEADER{
         u32 _RIFF;
         u32 dataSize;
@@ -300,7 +303,7 @@ void SaveToWav(FILE* wav){
 
     }wavfileheader{
         0x46464952,
-        astHeader.sampleCount*4+36,
+        0/*astHeader.sampleCount*4+36*/,
         0x45564157,
         0x20746D66,
 
@@ -311,14 +314,15 @@ void SaveToWav(FILE* wav){
 
         4,16,
         0x61746164,
-        astHeader.sampleCount*4
+        0/*astHeader.sampleCount*4*/
     };
-    fseek(wav,0,SEEK_SET);
-    fwrite(&wavfileheader,sizeof(wavfileheader),1,wav);
+    fseek(wav,sizeof(wavfileheader),SEEK_SET);
     fseek(curStream,64,SEEK_SET);
 
-
-    while(ftell(curStream)!=astHeader.dataSize+64){
+    int loopCount = 0;
+    bool anotherLoop = false;
+    bool fading = false;
+    while(1){
         BLOCKHEADER header;
         s16* buffer;
         fread(&header,sizeof(header),1,curStream);
@@ -332,7 +336,12 @@ void SaveToWav(FILE* wav){
         AssertNeof(curStream);
         fread(buffer,2,SampleCount,curStream);
         ChangeEndian16(buffer,SampleCount);
-        for(u32 i = 0; i<outSampleCount; i++){
+        u32 i;
+        if(anotherLoop){
+            i = LoopBeginOffset;
+            anotherLoop = false;
+        } else i = 0;
+        for(; i<outSampleCount; i++){
             s16 left,right;
             left = buffer[i];
             right = buffer[i+outSampleCount];
@@ -346,13 +355,33 @@ void SaveToWav(FILE* wav){
                     (1-surroundAlphaCache)*buffer[i+3*outSampleCount]
                     );
             }
+            if(fading){
+                left = (s16)(left*((double)currentFadeOut/fadeOutSampleCount));
+                right = (s16)(right*((double)currentFadeOut/fadeOutSampleCount));
+                --currentFadeOut;
+                if(currentFadeOut==0)goto endWav;
+            }
             fwrite(&left,2,1,wav);
             fwrite(&right,2,1,wav);
+            ++totalSampleCount;
         }
 
 
         delete[] buffer;
+
+        if(ftell(curStream)==astHeader.dataSize+64){
+            fseek(curStream,LoopBeginBlockOffset,SEEK_SET);
+            ++loopCount;
+            if(loopCount==2)fading = true;
+            anotherLoop = true;
+        }
     }
+    endWav:
+
+    wavfileheader.dataSize = totalSampleCount*4+36;
+    wavfileheader.dataSize2 = totalSampleCount*4;
+    fseek(wav,0,SEEK_SET);
+    fwrite(&wavfileheader,sizeof(wavfileheader),1,wav);
 }
 
 void OnExit(){
