@@ -359,7 +359,10 @@ void SaveToWav(FILE* wav){
                 left = (s16)(left*((double)currentFadeOut/fadeOutSampleCount));
                 right = (s16)(right*((double)currentFadeOut/fadeOutSampleCount));
                 --currentFadeOut;
-                if(currentFadeOut==0)goto endWav;
+                if(currentFadeOut==0){
+                    delete[] buffer;
+                    goto endWav;
+                }
             }
             fwrite(&left,2,1,wav);
             fwrite(&right,2,1,wav);
