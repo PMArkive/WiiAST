@@ -4,6 +4,7 @@
 #include <string>    //Console i/o parsing
 #include <cstdint>   //Integer types
 #include <atomic>    //Atomic vars
+#include <mutex>     //file lock
 #include "sound.h"
 using namespace std;
 
@@ -25,7 +26,7 @@ using s32 = int32_t;
 class bad_file:public exception{
     string w;
 public:
-    
+
     bad_file(const char* msg):w(msg){
 
     }
@@ -54,7 +55,7 @@ BIG_ENDIAN_32_STRUCT ASTHEADER{
     u32 magic;
     u32 dataSize;
     u32 Unk;
-    //swap UnkFFFF and channelCount for 
+    //swap UnkFFFF and channelCount for
     //convenience to use ChangeEndian32 directly
     u16 UnkFFFF;
     u16 channelCount;
@@ -103,6 +104,7 @@ BIG_ENDIAN_32_STRUCT BLOCKHEADER{
 //The .AST file
 atomic<FILE*> curStream(nullptr);
 
+mutex streamMutex;
 
 
 //surroundAlpha for 4-channel music
@@ -180,6 +182,7 @@ void WriteWave(){
     BLOCKHEADER blockHeader;
 
     try{
+        streamMutex.lock();
         if(ftell(curStream)==astHeader.dataSize+64){
             //If we hit the end of the file, then do the loop
             cout<<"Looping..."<<endl;
@@ -209,6 +212,8 @@ void WriteWave(){
         AssertNeof(curStream);
         fread(buffer,2,inSampleCount,curStream);
         ChangeEndian16(buffer,inSampleCount);
+
+        streamMutex.unlock();
 
         //Rearrange the data from "buffer" to "data"
         for(u32 i = 0; i<sampleCount; i++){
@@ -425,6 +430,7 @@ int main(){
                 //So we pause the music, badlly
                 SoundPause();
 
+                streamMutex.lock();
                 //Save the play position
                 long prevFilePos;
                 prevFilePos = ftell(curStream);
@@ -449,6 +455,7 @@ int main(){
 
                 //Resume the music
                 fseek(curStream,prevFilePos,SEEK_SET);
+                streamMutex.unlock();
                 SoundResume();
                 break;
 
