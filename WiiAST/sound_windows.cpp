@@ -5,6 +5,8 @@
 #include <iostream>
 using namespace std;
 
+#define BUFFER_COUNT 4
+
 //mmsystem waveout device
 HWAVEOUT hwo = NULL;
 WAVEFORMATEX wfe = {WAVE_FORMAT_PCM,2,44100,44100*4,4,16,sizeof(WAVEFORMATEX)};
@@ -51,7 +53,6 @@ void CALLBACK waveOutProc(
 
 void SoundPause(){
     waveOutPause(hwo);
-    Sleep(1000);//Wait mmsystem to react
 }
 void SoundResume(){
     waveOutRestart(hwo);
