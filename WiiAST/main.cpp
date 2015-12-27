@@ -16,7 +16,6 @@ using s8 = int8_t;
 using s16 = int16_t;
 using s32 = int32_t;
 
-//Number of buffer for autio output
 
 
 //Flag for wii's big endian structure
@@ -231,7 +230,7 @@ void WriteWave(){
         }
         delete[]buffer;
 
-        //Send the PCM data to mmsystem
+        //Send the PCM data to sound API
         if(AnotherLoop){
             //If it is a begining of a loop
             //send from the loop position
@@ -543,7 +542,6 @@ int main(){
         }
         cout<<"===Play==="<<endl;
 
-        //Init mmsystem
         cout<<"Init..."<<endl;
         if(!SoundInit(astHeader.sampleRate))continue;
 
