@@ -58,7 +58,6 @@ void SoundResume(){
     waveOutRestart(hwo);
 }
 bool SoundInit(int sampleRade){
-    cout<<"Init..."<<endl;
     wfe.nSamplesPerSec = sampleRade;
     wfe.nAvgBytesPerSec = wfe.nSamplesPerSec*4;
     MMRESULT mmresult;

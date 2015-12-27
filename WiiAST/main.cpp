@@ -544,6 +544,7 @@ int main(){
         cout<<"===Play==="<<endl;
 
         //Init mmsystem
+        cout<<"Init..."<<endl;
         if(!SoundInit(astHeader.sampleRate))continue;
 
         cout<<"Playing..."<<endl;
