@@ -4,7 +4,7 @@
 #include <string>    //Console i/o parsing
 #include <cstdint>   //Integer types
 #include <atomic>    //Atomic vars
-#include <Windows.h> //Audio output (using mmsystem)
+#include "sound.h"
 using namespace std;
 
 //Wii types
@@ -16,16 +16,21 @@ using s16 = int16_t;
 using s32 = int32_t;
 
 //Number of buffer for autio output
-#define BUFFER_COUNT 4
+
 
 //Flag for wii's big endian structure
 #define BIG_ENDIAN_32_STRUCT struct
 
 //Exception type def
 class bad_file:public exception{
+    string w;
 public:
-    bad_file(const char* msg):exception(msg){
+    
+    bad_file(const char* msg):w(msg){
 
+    }
+    virtual const char* what(){
+        return w.data();
     }
 };
 
@@ -98,16 +103,14 @@ BIG_ENDIAN_32_STRUCT BLOCKHEADER{
 //The .AST file
 atomic<FILE*> curStream(nullptr);
 
-//mmsystem waveout device
-HWAVEOUT hwo = NULL;
-WAVEFORMATEX wfe = { WAVE_FORMAT_PCM,2,44100,44100*4,4,16,sizeof(WAVEFORMATEX) };
+
 
 //surroundAlpha for 4-channel music
 atomic<double> surroundAlpha(0.8f);
 
 //Multi-thread conversation flag
 //Set before call waveOutReset
-atomic<bool> stopPlayFlag(false);
+
 
 //Loop position
 atomic<long> LoopBeginBlockOffset(64);// in bytes
@@ -151,13 +154,7 @@ void AssertNeof(FILE* file){
 //Stop the music and close everything
 void Cleanup(){
 
-    if(hwo){
-        stopPlayFlag = true;
-        waveOutReset(hwo);
-        waveOutClose(hwo);
-        stopPlayFlag = false;
-        hwo = NULL;
-    }
+    SoundCleanUp();
     if(curStream.load()){
         fclose(curStream);
         curStream = nullptr;
@@ -167,17 +164,12 @@ void Cleanup(){
 //WriteWave()
 //Read a block from the stream and send it to mmsystem
 void WriteWave(){
-    //The index of the buffer to write
-    //Count up after each WriteWave() call
-    static int swap = 0;
 
     //Data buffer
     //"data" for waveout
     //"buffer" for ast in
-    static s16* data[BUFFER_COUNT] = { 0 },*buffer = nullptr;
+    static s16* data = { 0 },*buffer = nullptr;
 
-    //WAVEHDR structure for waveout
-    static WAVEHDR wh[BUFFER_COUNT] = { 0 };
 
     double surroundAlphaCache = surroundAlpha;
 
@@ -204,13 +196,13 @@ void WriteWave(){
         blockHeader.AssertMagic();
 
         //Prepare the buffer
-        if(data[swap])delete[] data[swap];
+        if(data)delete[] data;
         //"sampleCount" - sample count for wavout, 2 channels totally
         //"inSampleCount" - sample count read from AST, 1/2/4 channels totally
         u32 sampleCount,inSampleCount;
         inSampleCount = blockHeader.blockSize*astHeader.channelCount/2;
         sampleCount = blockHeader.blockSize/* *2 /2 */;
-        data[swap] = new s16[sampleCount];
+        data = new s16[sampleCount];
         buffer = new s16[inSampleCount];
 
         //Read the PCM16 datablock
@@ -220,12 +212,12 @@ void WriteWave(){
 
         //Rearrange the data from "buffer" to "data"
         for(u32 i = 0; i<sampleCount; i++){
-            data[swap][i] = buffer[(
+            data[i] = buffer[(
                 i%2)*blockHeader.blockSize/2
                 +i/2];
             if(astHeader.channelCount==4){
-                data[swap][i] = (s16)(
-                    surroundAlphaCache*data[swap][i]+
+                data[i] = (s16)(
+                    surroundAlphaCache*data[i]+
                     (1-surroundAlphaCache)*buffer[(
                         i%2+2)*blockHeader.blockSize/2
                     +i/2]
@@ -238,21 +230,14 @@ void WriteWave(){
         if(AnotherLoop){
             //If it is a begining of a loop
             //send from the loop position
-            wh[swap].dwBufferLength = (sampleCount-LoopBeginOffset*2)*2;
-            wh[swap].lpData = (LPSTR)(data[swap]+LoopBeginOffset*2);
+            SoundWrite((const char *)(data+LoopBeginOffset*2),
+                (sampleCount-LoopBeginOffset*2)*2);
         }
         else{
             //Otherwise send the whole block
-            wh[swap].dwBufferLength = (sampleCount)*2;
-            wh[swap].lpData = (LPSTR)(data[swap]);
+            SoundWrite((const char *)data,
+                (sampleCount)*2);
         }
-        waveOutPrepareHeader(hwo,&wh[swap],sizeof(WAVEHDR));
-        waveOutWrite(hwo,&wh[swap],sizeof(WAVEHDR));
-        waveOutUnprepareHeader(hwo,&wh[swap],sizeof(WAVEHDR));
-
-        //Counting up the buffer index
-        swap++;
-        if(swap==BUFFER_COUNT)swap = 0;
     }
     catch(bad_file e){
         //Oops! The AST file is out of control!
@@ -265,19 +250,7 @@ void WriteWave(){
 
 }
 
-//Callback Proc for mmsystem
-void CALLBACK waveOutProc(
-    HWAVEOUT hwo,
-    UINT uMsg,
-    DWORD_PTR dwInstance,
-    DWORD_PTR dwParam1,
-    DWORD_PTR dwParam2
-    ){
-    if(uMsg==WOM_DONE && !stopPlayFlag){
-        //Send another block when a block is done
-        WriteWave();
-    }
-}
+
 
 void SaveToWav(FILE* wav){
     double surroundAlphaCache = surroundAlpha;
@@ -450,8 +423,7 @@ int main(){
                 //The stream cannot be used to
                 //play and convert at the same time.
                 //So we pause the music, badlly
-                waveOutPause(hwo);
-                Sleep(1000);//Wait mmsystem to react
+                SoundPause();
 
                 //Save the play position
                 long prevFilePos;
@@ -477,7 +449,7 @@ int main(){
 
                 //Resume the music
                 fseek(curStream,prevFilePos,SEEK_SET);
-                waveOutRestart(hwo);
+                SoundResume();
                 break;
 
             }
@@ -565,20 +537,10 @@ int main(){
         cout<<"===Play==="<<endl;
 
         //Init mmsystem
-        cout<<"Init..."<<endl;
-        wfe.nSamplesPerSec = astHeader.sampleRate;
-        wfe.nAvgBytesPerSec = wfe.nSamplesPerSec*4;
-        MMRESULT mmresult;
-        mmresult = waveOutOpen(&hwo,WAVE_MAPPER,&wfe,(DWORD_PTR)waveOutProc,0,
-            CALLBACK_FUNCTION);
-        if(mmresult){
-            cout<<"Failed to init mmsystem. Code="<<mmresult<<endl;
-            continue;
-        }
+        if(!SoundInit(astHeader.sampleRate))continue;
 
-        //Sent the first BUFFER_COUNT blocks to mmsystem to start playing
         cout<<"Playing..."<<endl;
-        for(int i = 0; i<BUFFER_COUNT; i++)WriteWave();
+        SoundStart();
 
     }
 
