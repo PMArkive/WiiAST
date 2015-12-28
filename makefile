@@ -1,5 +1,5 @@
 binDir=bin
-srcDir=WiiAST
+srcDir=src
 VPATH=$(srcDir)
 objects=$(binDir)/main.o $(binDir)/sound.o
 binName=WiiAST_linux
