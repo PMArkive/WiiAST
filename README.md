@@ -9,4 +9,4 @@ A simple player on Windows/Linux console for Wii's .ast stream file. (such as mu
 
 ## Linux Build
 
- - Build from source files `WiiAST/main.cpp` and `WiiAST/sound_linux.cpp`, with library `-lasound` and `-lpthread`.
+Just run `make`

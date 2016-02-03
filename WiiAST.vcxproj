@@ -149,11 +149,11 @@
     </Bscmake>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp" />
-    <ClCompile Include="sound_windows.cpp" />
+    <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\sound_windows.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="sound.h" />
+    <ClInclude Include="src\sound.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

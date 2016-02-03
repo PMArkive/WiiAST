@@ -15,15 +15,15 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp">
+    <ClCompile Include="src\main.cpp">
       <Filter>Source</Filter>
     </ClCompile>
-    <ClCompile Include="sound_windows.cpp">
+    <ClCompile Include="src\sound_windows.cpp">
       <Filter>Source</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="sound.h">
+    <ClInclude Include="src\sound.h">
       <Filter>Header</Filter>
     </ClInclude>
   </ItemGroup>
