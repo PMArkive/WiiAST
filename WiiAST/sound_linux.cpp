@@ -16,6 +16,7 @@ void SoundCleanUp()
         playingThread->join();
     }
     delete playingThread;
+    playingThread=nullptr;
     stopFlag=false;
 
     if(playback_handle)
